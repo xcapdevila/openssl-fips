@@ -22,6 +22,13 @@ docker run --rm "$image" /bin/bash -c 'test "$(id -u)" -eq 10001 && openssl list
     >"$negative_dir/nonroot.log"
 grep -q 'OpenSSL FIPS Provider' "$negative_dir/nonroot.log"
 
+printf '%s\n' 'Checking repository and bundled component license notices...'
+docker run --rm --entrypoint sh "$image" -ec '
+    grep -q "MIT License" /usr/share/doc/openssl-fips/LICENSE
+    grep -q "Apache License" /usr/share/doc/openssl-from-source/OPENSSL-LICENSE.txt
+    grep -q "Apache License" /usr/share/doc/openssl-from-source/FIPS-LICENSE.txt
+'
+
 printf '%s\n' 'Checking the quoted FIPS random-generation command...'
 docker run --rm "$image" 'openssl rand -provider fips -base64 32' \
     >"$negative_dir/random-base64.txt"

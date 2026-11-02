@@ -62,12 +62,21 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.title="OpenSSL with a FIPS provider" \
+    org.opencontainers.image.description="Configurable OpenSSL CLI and separately built FIPS provider; not a deployment certification" \
+    org.opencontainers.image.source="https://github.com/xcapdevila/openssl-fips" \
+    org.opencontainers.image.url="https://github.com/xcapdevila/openssl-fips" \
+    org.opencontainers.image.version="${OPENSSL_VERSION}-fips-${FIPS_OPENSSL_VERSION}" \
+    org.opencontainers.image.revision=$VCS_REF
+
 # Copy only runtime artifacts and the separately installed selected module.
 COPY --from=runtime-builder /build/runtime-root/opt/openssl/ /opt/openssl/
 COPY --from=fips-builder /build/fips-install/lib/ossl-modules/fips.so /opt/openssl/lib/ossl-modules/fips.so
 COPY --from=fips-builder /build/fips-module.sha256 /opt/openssl/ssl/fips-module.sha256
 COPY --from=fips-builder /build/licenses/ /usr/share/doc/openssl-from-source/
 COPY --from=runtime-builder /build/licenses/ /usr/share/doc/openssl-from-source/
+COPY LICENSE /usr/share/doc/openssl-fips/LICENSE
 COPY openssl-fips.cnf /opt/openssl/ssl/openssl.cnf
 COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
