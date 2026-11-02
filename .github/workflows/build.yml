@@ -1,0 +1,60 @@
+name: Build and verify FIPS provider
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fips-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Version and checksum contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify source selection without network access
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+
+  container:
+    name: Linux ${{ matrix.architecture }} (${{ matrix.profile }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            architecture: amd64
+            profile: defaults
+          - runner: ubuntu-24.04-arm
+            architecture: arm64
+            profile: defaults
+          - runner: ubuntu-24.04
+            architecture: amd64
+            profile: version-overrides
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build on the native architecture
+        run: |
+          set --
+          if [ '${{ matrix.profile }}' = version-overrides ]; then
+            set -- --build-arg OPENSSL_VERSION=openssl-4.1.0 \
+                   --build-arg FIPS_OPENSSL_VERSION=openssl-3.0.9
+          fi
+          docker buildx build --load --progress=plain \
+            --platform linux/${{ matrix.architecture }} \
+            --tag openssl-fips:ci "$@" .
+      - name: Verify runtime and failure behavior
+        run: ./tests/run.sh openssl-fips:ci

@@ -1,0 +1,6 @@
+**
+!Dockerfile
+!docker-entrypoint.sh
+!openssl-fips.cnf
+!scripts/
+!scripts/fetch-source.sh
