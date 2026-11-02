@@ -35,4 +35,3 @@ jobs:
         run: docker buildx build --load --progress=plain --tag openssl-fips:ci .
       - name: Verify runtime and failure behavior
         run: ./tests/run.sh openssl-fips:ci
-
