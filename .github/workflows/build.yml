@@ -143,7 +143,7 @@ jobs:
             > "$RUNNER_TEMP/commit-manifest.json" 2> "$RUNNER_TEMP/commit-inspect.log"; then
             # A rerun or release at an existing commit retains its first verified image.
             digest=$(jq -r .digest "$RUNNER_TEMP/commit-manifest.json")
-            gh attestation verify "oci://$IMAGE@$digest" --repo "$GITHUB_REPOSITORY"
+            gh attestation verify "oci://$IMAGE@$digest" --repo "$GITHUB_REPOSITORY" --source-digest "$GITHUB_SHA"
             printf 'new-image=false\n' >> "$GITHUB_OUTPUT"
           elif grep -Eiq 'manifest unknown|not found' "$RUNNER_TEMP/commit-inspect.log"; then
             build_tag="$IMAGE:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
