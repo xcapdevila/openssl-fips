@@ -7,18 +7,23 @@ fail() {
     exit 1
 }
 
-expected_runtime=${EXPECTED_OPENSSL_VERSION:-3.5.9}
-expected_fips=${EXPECTED_FIPS_VERSION:-3.1.2}
+runtime_tag=${OPENSSL_SOURCE_TAG:-openssl-3.5.9}
+fips_tag=${FIPS_SOURCE_TAG:-openssl-3.1.2}
+expected_runtime=${EXPECTED_OPENSSL_VERSION:-${runtime_tag#openssl-}}
+expected_fips=${EXPECTED_FIPS_VERSION:-${fips_tag#openssl-}}
 test_dir=$(mktemp -d /tmp/openssl-smoke.XXXXXXXXXX)
 trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
 
 [ "$(command -v openssl)" = /opt/openssl/bin/openssl ] || fail 'unexpected OpenSSL executable'
 openssl version | grep -F "OpenSSL $expected_runtime " >/dev/null || fail 'runtime version'
 ldd /opt/openssl/bin/openssl > "$test_dir/libraries"
-grep -F 'libcrypto.so.3 => /opt/openssl/lib/libcrypto.so.3 ' "$test_dir/libraries" >/dev/null || \
-    fail 'libcrypto does not resolve to the installed runtime'
-grep -F 'libssl.so.3 => /opt/openssl/lib/libssl.so.3 ' "$test_dir/libraries" >/dev/null || \
-    fail 'libssl does not resolve to the installed runtime'
+for library in libcrypto libssl; do
+    awk -v library="$library" '
+        $1 ~ ("^" library "\\.so\\.[0-9]+$") && $2 == "=>" &&
+            $3 == ("/opt/openssl/lib/" $1) { found = 1 }
+        END { exit !found }
+    ' "$test_dir/libraries" || fail "$library does not resolve to the installed runtime"
+done
 
 openssl list -providers > "$test_dir/providers"
 for provider in fips base; do

@@ -35,7 +35,7 @@ docker run --rm openssl-fips:local
 ```
 
 The default command lists the active providers: `base` from 3.5.9 and `fips` from
-3.1.2. Other commands accept normal argument lists:
+3.1.2 when built with the defaults. Other commands accept normal argument lists:
 
 ```sh
 docker run --rm openssl-fips:local openssl version -a
@@ -114,26 +114,65 @@ compatibility and refusal to start with a missing, modified or unusable module
 configuration. They are not a substitute for module validation or the full upstream
 OpenSSL test suite.
 
-GitHub Actions builds and tests natively on Linux AMD64 and ARM64. Images are not
-automatically published to a registry.
+GitHub Actions builds and tests the defaults natively on Linux AMD64 and ARM64,
+and tests an OpenSSL 4.1.0 / provider 3.0.9 version-only override on AMD64. These
+combinations check technical operation, not deployment validation. Source-selection
+tests cover automatic/explicit checksums and malformed inputs without network
+access. Images are not automatically published to a registry.
+
+```sh
+python3 -m unittest discover -s tests -p 'test_*.py'
+```
 
 ## Updating the build
 
-The existing version argument names are preserved. Change a version and its
-matching archive checksum together:
+The original two version arguments remain independent. Passing just the versions
+is sufficient; no additional checksum argument is required:
 
 ```sh
 docker build \
-  --build-arg OPENSSL_VERSION=openssl-X.Y.Z \
-  --build-arg OPENSSL_SHA256=OFFICIAL_ARCHIVE_SHA256 \
-  -t openssl-fips:local .
+  --build-arg OPENSSL_VERSION=openssl-4.1.0 \
+  --build-arg FIPS_OPENSSL_VERSION=openssl-3.1.2 \
+  -t openssl-fips:custom .
+./tests/run.sh openssl-fips:custom
 ```
 
-The corresponding provider arguments are `FIPS_OPENSSL_VERSION` and
-`FIPS_OPENSSL_SHA256`. Obtain hashes from the official release assets, review the
-module's validation/security status independently, and rerun the checks after an
-update. `MAKE_JOBS` controls parallel compilation and defaults to 2.
+For the two default releases, the source helper uses repository-pinned archive
+hashes. For another release, it retrieves that release's official `.sha256` asset
+over verified HTTPS and verifies the archive before extraction. This checks
+integrity against the official download source; it is not independent OpenPGP
+signature verification.
 
-The base image digest, archive hashes and CI action revisions are pinned. Package
+`OPENSSL_SHA256` and `FIPS_OPENSSL_SHA256` are optional explicit pins. When supplied,
+they take precedence and a mismatch fails the build. Fetch the desired hashes from
+the official release assets when you want independently pinned custom releases.
+There is no fallback to disabled certificate verification. `MAKE_JOBS` controls
+parallel compilation and defaults to 2.
+
+Runtime and provider sources are extracted and built in separate stages, including
+when both version arguments are equal. Runtime installation selects its own shared
+library ABI, so the image does not hardcode `libcrypto.so.3` or `libssl.so.3`.
+
+## Version compatibility
+
+This image uses the OpenSSL provider architecture: both arguments select release
+tags `openssl-X.Y.Z` from version 3 onwards. Legacy OpenSSL 1.x and the historical
+FIPS Object Module 2.0 use a different integration and are not supported by this
+Dockerfile.
+
+The versions do not need to match. The official
+[FIPS module support policy](https://www.openssl-library.org/policies/general/fips-module-support-policy/)
+supports an unchanged, supported validated module with supported OpenSSL runtimes
+from 3.0 onwards, including later major releases. In particular, the 3.1.2 FIPS
+provider can be paired with a supported 3.5, 4.0 or 4.1 runtime.
+
+There is no general rule that the provider's version must be less than or equal to
+the runtime's. However, choosing an arbitrary unvalidated provider release does not
+give it a validation or a universal cross-major compatibility guarantee. Build and
+test the selected pair, and assess the module's current certificate/security-policy
+requirements separately. See the [maintainer compatibility discussion](https://groups.google.com/a/openssl.org/g/openssl-users/c/8RKcjxiAMmM/m/xm-HkPEbAwAJ).
+
+The base image digest, default archive hashes and CI action revisions are pinned.
+Other versions resolve their official checksums unless explicitly pinned. Package
 installation still uses the distribution's current signed repositories, so this
 build does not claim bit-for-bit reproducibility.

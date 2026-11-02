@@ -1,2 +1,4 @@
 *.log
 test-results/
+__pycache__/
+*.py[cod]
