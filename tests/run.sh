@@ -22,6 +22,17 @@ docker run --rm "$image" /bin/bash -c 'test "$(id -u)" -eq 10001 && openssl list
     >"$negative_dir/nonroot.log"
 grep -q 'OpenSSL FIPS Provider' "$negative_dir/nonroot.log"
 
+printf '%s\n' 'Checking the quoted FIPS random-generation command...'
+docker run --rm "$image" 'openssl rand -provider fips -base64 32' \
+    >"$negative_dir/random-base64.txt"
+grep -Eq '^[A-Za-z0-9+/]{43}=$' "$negative_dir/random-base64.txt"
+docker run --rm -i "$image" openssl base64 -d \
+    <"$negative_dir/random-base64.txt" >"$negative_dir/random.bin"
+[ "$(wc -c <"$negative_dir/random.bin")" -eq 32 ] || {
+    printf '%s\n' 'FAIL: quoted FIPS command did not produce 32 random bytes' >&2
+    exit 1
+}
+
 expect_refusal() {
     name=$1
     shift

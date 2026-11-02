@@ -34,6 +34,17 @@ docker build --progress=plain -t openssl-fips:local .
 docker run --rm openssl-fips:local
 ```
 
+To generate 32 random bytes (256 bits) through the FIPS provider and print them in
+Base64, the original quoted command remains supported:
+
+```sh
+docker run --rm -it openssl-fips:local "openssl rand -provider fips -base64 32"
+```
+
+The result is 44 Base64 characters followed by a newline. `-it` is useful for an
+interactive terminal; omit it in scripts. `--rm` removes the container after exit.
+The repository tests execute this quoted command and verify its decoded length.
+
 The default command lists the active providers: `base` from 3.5.9 and `fips` from
 3.1.2 when built with the defaults. Other commands accept normal argument lists:
 
