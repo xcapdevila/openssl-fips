@@ -27,6 +27,46 @@ and [NIST certificate #4985](https://csrc.nist.gov/projects/cryptographic-module
 
 ## Build and run
 
+### Published container
+
+The publication workflow sends verified default builds to
+`ghcr.io/xcapdevila/openssl-fips` for Linux AMD64 and ARM64. Publication runs only
+after all source and native container checks pass on the default branch or a
+release tag; pull requests cannot publish images. The first publication requires
+the maintainer to make the package public and verify anonymous access, as described
+in the [release guide](docs/RELEASING.md).
+
+Once the package is public, no GitHub login is needed:
+
+```sh
+docker run --rm -it ghcr.io/xcapdevila/openssl-fips:latest \
+  "openssl rand -provider fips -base64 32"
+```
+
+`latest` follows the current verified `main` commit. A release tag such as `v0.1.0`
+also produces `v0.1.0` and `0.1.0` image tags. `sha-<full-commit-id>` retains the
+first verified image published for that source commit. Prefer a release tag or,
+for an exact artifact, the `sha256` manifest digest printed in the workflow summary:
+
+```sh
+docker run --rm ghcr.io/xcapdevila/openssl-fips@sha256:MANIFEST_DIGEST \
+  openssl rand -provider fips -base64 32
+```
+
+Replace `MANIFEST_DIGEST` with the real digest. Each platform image records its
+source repository and commit in OCI labels. The multi-platform manifest has a
+GitHub build-provenance attestation; verify one with:
+
+```sh
+gh attestation verify oci://ghcr.io/xcapdevila/openssl-fips@sha256:MANIFEST_DIGEST \
+  --repo xcapdevila/openssl-fips
+```
+
+The published image uses the defaults below. Building locally retains the independent
+runtime/provider version arguments; publication does not restrict custom builds.
+
+### Local build
+
 Docker with Linux containers is required. Build natively on your host:
 
 ```sh
@@ -129,7 +169,9 @@ GitHub Actions builds and tests the defaults natively on Linux AMD64 and ARM64,
 and tests an OpenSSL 4.1.0 / provider 3.0.9 version-only override on AMD64. These
 combinations check technical operation, not deployment validation. Source-selection
 tests cover automatic/explicit checksums and malformed inputs without network
-access. Images are not automatically published to a registry.
+access. Container checks also verify that repository and OpenSSL license notices
+are present in the final image. Successful trusted builds publish the exact tested
+default platform images; the override profile remains a compatibility check.
 
 ```sh
 python3 -m unittest discover -s tests -p 'test_*.py'
@@ -187,3 +229,15 @@ The base image digest, default archive hashes and CI action revisions are pinned
 Other versions resolve their official checksums unless explicitly pinned. Package
 installation still uses the distribution's current signed repositories, so this
 build does not claim bit-for-bit reproducibility.
+
+## License
+
+The Dockerfile, entrypoint, helper scripts, configuration, tests and documentation
+in this repository are licensed under the [MIT License](LICENSE). The image includes
+that notice at `/usr/share/doc/openssl-fips/LICENSE`.
+
+OpenSSL and the FIPS provider retain their own Apache 2.0 license. The original
+notices from the selected source archives are included in
+`/usr/share/doc/openssl-from-source/OPENSSL-LICENSE.txt` and `FIPS-LICENSE.txt`.
+Ubuntu and its packages retain their respective licenses; the repository's MIT
+license does not relicense those components.
